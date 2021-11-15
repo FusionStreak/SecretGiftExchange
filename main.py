@@ -1,9 +1,11 @@
 from email import message
+import json
 import smtplib
 import ssl
 import random
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from cryptography.fernet import Fernet
 
 port = 465  # For SSL
 srcEmail = input("Type in source email: ")
@@ -24,8 +26,6 @@ for part in particpants:
     while (matchup[part] == part) or (matchup[part] in selected):
         matchup[part] = random.sample(sorted(particpants), 1)[0]
     selected.append(matchup[part])
-
-print(matchup)
 
 # Create a secure SSL context
 context = ssl.create_default_context()
@@ -49,7 +49,6 @@ msgHTML = """\
     </html>
     """
 
-
 with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
     server.login(srcEmail, password)
     for part in particpants:
@@ -62,3 +61,16 @@ with smtplib.SMTP_SSL("smtp.gmail.com", port, context=context) as server:
         message.attach(MIMEText(msgHTML.format(
             person=part, match=matchup[part]), "html"))
         server.sendmail(srcEmail, particpants[part], message.as_string())
+
+    key = Fernet.generate_key()
+    fernet = Fernet(key=key)
+    msg = """\
+        Subject: Your encrypted matches
+
+
+        Key: {k}
+
+        Matches: {m}
+        """.format(k=key.decode(), m=fernet.encrypt(json.dumps(matchup).encode()).decode())
+    print(msg)
+    server.sendmail(srcEmail, srcEmail, msg=msg)
